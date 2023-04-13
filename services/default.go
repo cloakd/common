@@ -1,6 +1,6 @@
 package services
 
-import "context"
+import "github.com/cloakd/common/context"
 
 type DefaultService struct {
 	ctx *context.Context
