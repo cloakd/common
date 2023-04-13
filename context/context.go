@@ -41,8 +41,13 @@ func (ctx *Context) Service(id string) Service {
 	return ctx.services[id]
 }
 
-func (ctx *Context) Services() map[string]Service {
-	return ctx.services
+func (ctx *Context) Services() []string {
+	var keys []string
+	for k := range ctx.services {
+		keys = append(keys, k)
+	}
+
+	return keys
 }
 
 func (ctx *Context) Run() error {
