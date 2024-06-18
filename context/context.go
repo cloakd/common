@@ -1,8 +1,12 @@
 package context
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 type Context struct {
@@ -51,12 +55,30 @@ func (ctx *Context) Services() []string {
 }
 
 func (ctx *Context) Run() error {
+	// Create a context that is canceled on SIGINT or SIGTERM
+	_, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	// Start a goroutine that will wait for a signal
+	go func() {
+		sig := <-sigChan
+		log.Printf("Received signal: %v. Shutting down...", sig)
+
+		for i := 0; i < len(ctx.startOrder); i++ {
+			svcId := ctx.startOrder[i]
+			log.Printf("Shutting down %s...", svcId)
+			ctx.services[svcId].Shutdown()
+		}
+		cancel()
+	}()
+
 	for i := 0; i < len(ctx.startOrder); i++ {
 		svcId := ctx.startOrder[i]
-		err := ctx.Configure(ctx.services[svcId])
 
-		if err != nil {
-			log.Fatal(err)
+		if err := ctx.Configure(ctx.services[svcId]); err != nil {
+			log.Fatalf("Context Configure Error: %s - %s", svcId, err)
 			return err
 		}
 	}
@@ -64,10 +86,8 @@ func (ctx *Context) Run() error {
 	for i := 0; i < len(ctx.startOrder); i++ {
 		svcId := ctx.startOrder[i]
 
-		err := ctx.Start(ctx.services[svcId])
-
-		if err != nil {
-			log.Fatal(err)
+		if err := ctx.Start(ctx.services[svcId]); err != nil {
+			log.Fatalf("Context Start Error: %s - %s", svcId, err)
 			return err
 		}
 	}
